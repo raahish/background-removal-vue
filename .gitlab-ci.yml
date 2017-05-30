@@ -5,6 +5,7 @@ pages:
   script:
   - yarn
   - NODE_ENV=production npm run build
+  - cat dist/index.html
   artifacts:
     paths:
     - dist
