@@ -1,12 +1,9 @@
-image: node
-
-before_script:
-  - npm install -g yarn
+image: node:latest
 
 pages:
   stage: deploy
   script:
-  - npm run build
+  - yarn
   - mkdir public
   - cp -r dist/* public
   artifacts:
