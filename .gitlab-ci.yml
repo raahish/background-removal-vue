@@ -1,4 +1,7 @@
-image: node:latest
+image: node
+
+before_script:
+  - npm install
 
 pages:
   stage: deploy
