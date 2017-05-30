@@ -3,6 +3,7 @@ image: node:latest
 pages:
   stage: deploy
   script:
+  - git lfs pull
   - yarn
   - NODE_ENV=production npm run build
   - cat dist/index.html
