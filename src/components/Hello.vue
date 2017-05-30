@@ -10,7 +10,8 @@
     <input
       v-model="imageURLInput"
       spellcheck="false"
-      @keyup.native.enter="onImageURLInputEnter"
+      @change="onImageURLInputEnter"
+      @keyup.enter="onImageURLInputEnter"
     >
     <div class="error" v-if="imageLoadingError">Error loading URL</div>
     <div class="canvas-container">
@@ -85,7 +86,7 @@ export default {
     this.model.ready().then(() => {
       this.modelLoading = false
       this.$nextTick(() => {
-        this.loadImageToCanvas(this.imageURLInput)
+//        this.loadImageToCanvas(this.imageURLInput)
       })
     })
   },
@@ -101,7 +102,7 @@ export default {
 
       this.imageLoading = true
       loadImage(
-        url,
+        'https://crossorigin.me/' + url,
         img => {
           if (img.type === 'error') {
             this.imageLoadingError = true
@@ -159,7 +160,6 @@ export default {
           argmaxArray[xy*4+2] = COLOR_CODES[max][2]
           argmaxArray[xy*4+3] = 255
         }
-        console.log('ii', ii)
         window.output = this.output = new ImageData(argmaxArray, width, height)
         this.drawOutput()
       })
