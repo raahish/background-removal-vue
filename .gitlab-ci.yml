@@ -5,10 +5,8 @@ pages:
   script:
   - yarn
   - npm run build
-  - mkdir public
-  - cp -r dist/* public
   artifacts:
     paths:
-    - public
+    - dist
   only:
   - master
