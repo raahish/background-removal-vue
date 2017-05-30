@@ -67,7 +67,7 @@ export default {
     return {
       model: new KerasJS.Model(MODEL_CONFIG), // eslint-disable-line
       modelLoading: true,
-      imageURLInput: '/static/container.jpg',
+      imageURLInput: 'static/container.jpg',
       imageURLSelect: null,
       imageLoading: false,
       imageLoadingError: false,
