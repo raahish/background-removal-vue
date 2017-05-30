@@ -8,9 +8,10 @@ module.exports = {
   },
   env: {
     browser: true,
+    es6: true
   },
   // https://github.com/feross/standard/blob/master/RULES.md#javascript-standard-style
-  extends: 'standard',
+  extends: 'eslint:recommended',
   // required to lint *.vue files
   plugins: [
     'html'
@@ -19,9 +20,12 @@ module.exports = {
   'rules': {
     // allow paren-less arrow functions
     'arrow-parens': 0,
+    'no-unused-vars': 0,
     // allow async-await
     'generator-star-spacing': 0,
     // allow debugger during development
+    "no-console": 0,
     'no-debugger': process.env.NODE_ENV === 'production' ? 2 : 0
   }
 }
+

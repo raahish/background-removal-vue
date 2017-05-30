@@ -25,6 +25,9 @@ module.exports = {
       '@': resolve('src')
     }
   },
+  node: {
+    fs: 'empty'
+  },
   module: {
     rules: [
       {
@@ -46,6 +49,7 @@ module.exports = {
         loader: 'babel-loader',
         include: [resolve('src'), resolve('test')]
       },
+      { test: /\.(glsl|frag|vert)$/, use: ['raw-loader', 'glslify-loader'] },
       {
         test: /\.(png|jpe?g|gif|svg)(\?.*)?$/,
         loader: 'url-loader',
