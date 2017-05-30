@@ -6,8 +6,9 @@ pages:
   - yarn
   - NODE_ENV=production npm run build
   - cat dist/index.html
+  - cp -r dist public
   artifacts:
     paths:
-    - dist
+    - public
   only:
   - master
