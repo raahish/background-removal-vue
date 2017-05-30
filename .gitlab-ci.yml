@@ -4,7 +4,6 @@ pages:
   stage: deploy
   before_script:
     # Install git-lfs
-    - apk add openssl --update-cache
     - wget -qO- https://github.com/git-lfs/git-lfs/releases/download/v2.1.1/git-lfs-linux-amd64-2.1.1.tar.gz | tar xz
     - mv git-lfs-*/git-lfs /usr/bin/ && rm -rf git-lfs-* && git lfs install && git lfs pull
   script:
