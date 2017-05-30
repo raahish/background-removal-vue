@@ -1,0 +1,11 @@
+image: alpine:latest
+
+pages:
+  stage: deploy
+  script:
+  - npm run build
+  artifacts:
+    paths:
+    - dist
+  only:
+  - master
