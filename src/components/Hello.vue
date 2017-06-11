@@ -10,14 +10,18 @@
       Loading Keras model...{{ loadingProgress }}%
     </div>
 
-    <dropzone
+    <droply
       :class="{hidden: modelLoading}"
       ref="dropzone"
       id="dropzone"
       url="#"
-      :dropzoneOptions="{resizeWidth: 448, url: '#', parallelUploads: 1}"
-      :useCustomDropzoneOptions="true"></dropzone>
+      :dropzoneOptions="{resizeWidth: 448, resize: resize, parallelUploads: 1}"
+      :parallelUploads="1"></droply>
 
+    <div class="intermediates" v-if="showIntermediates">
+      <img src="" width="224" height="224" ref="inputImg" />
+      <canvas ref="inputCanvas" ></canvas>
+    </div>
     <div class="error" v-if="imageLoadingError">Error loading URL</div>
     <div class="results" v-for="src of output">
       <img :src="src" />
@@ -58,16 +62,16 @@ import loadImage from 'blueimp-load-image'
 import ndarray from 'ndarray'
 import ops from 'ndarray-ops'
 import * as utils from '../utils'
-import Dropzone from 'vue2-dropzone'
+import EXIF from 'exif-js'
+import Droply from './Droply'
+import Dropzone from 'dropzone'
 
-window.ndarray = ndarray
-window.ops = ops
-window.utils = utils
+window.EXIF = EXIF // Dropzone needs this as a global
 
 export default {
   name: 'hello',
   components: {
-    Dropzone
+    Droply
   },
   data () {
     return {
@@ -80,6 +84,7 @@ export default {
       output: [],
       files: [],
       intervals: [],
+      showIntermediates: false,
     }
   },
   computed: {
@@ -96,20 +101,62 @@ export default {
     })
   },
   methods: {
+    // Helper function that uses HTML5 FileReader API in a form of a Promise
     readLocalFile: function(file) {
       return new Promise((resolve,reject) => {
-        let reader = new window.FileReader();
+        const reader = new window.FileReader();
         reader.onload = () => resolve(reader.result)
         reader.onerror = () => reject(reader.result)
         // run the reader
         reader.readAsDataURL(file);
       });
     },
+
+    // Helper for runModel()
     loadNextImageToCanvas: function() {
       let file = this.files.pop()
       this.runModel(file)
     },
 
+    // Override Dropzone.defaultOptions.resize method to allow 'squeeze' mode
+    resize: function(file, width, height, resizeMethod) {
+      console.log('my resize', resizeMethod)
+      if(resizeMethod=='contain' || resizeMethod=='crop') {
+        return Dropzone.prototype.defaultOptions.resize(file, width, height, resizeMethod)
+      }
+      return {
+        srcX: 0,
+        srcY: 0,
+        srcWidth: file.width,
+        srcHeight: file.height,
+        trgWidth: width,
+        trgHeight: height,
+      };
+    },
+
+    // Called by Dropzone when a new file is added
+    uploadFiles: function(files) {
+      files.forEach(file => {
+        this.$refs.dropzone.dropzone.createThumbnail(file, 224, 224, 'squeeze', true, dataUrl => {
+          const img =  this.$refs.inputImg || new Image
+          img.src=dataUrl
+          return this.runModel(img, file)
+        })
+//        this.readLocalFile(file).then(result => {
+//          const img =  this.$refs.inputImg new Image
+//          img.width = 224
+//          img.height = 224
+//          img.src = result
+//          return this.runModel(img, file)
+//        })
+      })
+    },
+
+    beforeDestroy: function() {
+      this.intervals.forEach(i => clearInterval(i))
+    },
+
+    // Helper function to set progress bar
     updateDropzoneFileProgress: function(file, progress) {
       const self = this.$refs.dropzone.dropzone
       self.emit('uploadprogress', file, progress)
@@ -121,30 +168,13 @@ export default {
       }
     },
 
-    uploadFiles: function(files) {
-      files.forEach(file => {
-        this.readLocalFile(file).then(result => {
-          const img =  new Image
-          img.width = 224
-          img.height = 224
-          img.src = result
-          return this.runModel(img, file)
-        })
-      })
-    },
-
-    beforeDestroy: function() {
-      this.intervals.forEach(i => clearInterval(i))
-    },
-
     runModel: function(img, file) {
-      let canvas = document.createElement('canvas')
+      let canvas = this.$refs.inputCanvas || document.createElement('canvas')
       canvas.width = 224
       canvas.height = 224
       const ctx = canvas.getContext('2d')
       ctx.drawImage(img, 0, 0, img.width, img.height)
       const { data, width, height } = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
-      window.imageData = data
 
 //      // data processing
 //      // see https://github.com/fchollet/keras/blob/master/keras/applications/imagenet_utils.py
@@ -156,19 +186,23 @@ export default {
       ops.assign(dataProcessedTensor.pick(null, null, 2), dataTensor.pick(null, null, 2))
       console.log('inputTensors', this.model.inputTensors)
       const inputKey = Object.keys(this.model.inputTensors)[0]
-      const inputData = { [inputKey]: dataProcessedTensor.data }
+      const inputData = window.inputData = { [inputKey]: dataProcessedTensor.data }
       const n_layers = Object.keys(this.model.modelDAG).length
       console.log("start", n_layers)
       const intervalId = setInterval(() => {
         console.log(this.model.layersWithResults.length)
         this.updateDropzoneFileProgress(file, this.model.layersWithResults.length/n_layers*90)
       }, 1000)
+      this.intervals.push(intervalId)
       return this.model.predict(inputData).then(outputData => {
         console.log("done")
         clearInterval(intervalId)
+        this.intervals.splice(this.intervals.indexOf(intervalId))
         this.updateDropzoneFileProgress(file, 100)
+
+        // Process output into Alpha channel
         let outputLayerName = _.values(this.model.modelDAG).filter(node => !node.outbound.length)[0].name
-        window.outputData = outputData = outputData[outputLayerName]
+        outputData = outputData = outputData[outputLayerName]
         console.log('outputLayerName', outputLayerName)
         let n_activations = outputData.length / width / height
         console.log('n_activations', n_activations)
@@ -194,6 +228,7 @@ export default {
           argmaxArray[xy*4+2] = data[xy*4+2]
           argmaxArray[xy*4+3] = max!=BACKGROUND_CLASS ? maxValue*255 : 0
         }
+
         this.drawOutput(new ImageData(argmaxArray, width, height))
         if(this.files.length) {
           this.loadNextImageToCanvas()
@@ -203,14 +238,14 @@ export default {
         console.log('done displaying')
       })
     },
-    drawOutput: function(imageData) {
+    drawOutput: function(imageData, originalImageData, originalWidth, originalHeight) {
       const canvas = document.createElement('canvas')
       canvas.width = 224
       canvas.height = 224
       const ctx = canvas.getContext('2d')
       ctx.putImageData(imageData, 0, 0)
 
-      this.output.push(canvas.toDataURL('image/png'))
+      this.output.unshift(canvas.toDataURL('image/png'))
     },
   }
 
