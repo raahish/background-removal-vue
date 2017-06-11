@@ -120,7 +120,6 @@ export default {
 
     // Override Dropzone.defaultOptions.resize method to allow 'squeeze' mode
     resize: function(file, width, height, resizeMethod) {
-      console.log('my resize', resizeMethod)
       if(resizeMethod=='contain' || resizeMethod=='crop') {
         return Dropzone.prototype.defaultOptions.resize(file, width, height, resizeMethod)
       }
@@ -139,16 +138,9 @@ export default {
       files.forEach(file => {
         this.$refs.dropzone.dropzone.createThumbnail(file, 224, 224, 'squeeze', true, dataUrl => {
           const img =  this.$refs.inputImg || new Image
+          img.onload = () => this.runModel(img, file)
           img.src=dataUrl
-          return this.runModel(img, file)
         })
-//        this.readLocalFile(file).then(result => {
-//          const img =  this.$refs.inputImg new Image
-//          img.width = 224
-//          img.height = 224
-//          img.src = result
-//          return this.runModel(img, file)
-//        })
       })
     },
 
@@ -169,7 +161,7 @@ export default {
     },
 
     runModel: function(img, file) {
-      let canvas = this.$refs.inputCanvas || document.createElement('canvas')
+      const canvas = this.$refs.inputCanvas || document.createElement('canvas')
       canvas.width = 224
       canvas.height = 224
       const ctx = canvas.getContext('2d')
