@@ -16,7 +16,7 @@
   "dependencies": {
     "blueimp-load-image": "^2.12.2",
     "dropzone": "^5.0.1",
-    "exif-js": "^2.2.1",
+    "exif-js": "2.1.1",
     "fs": "0.0.1-security",
     "keras-js": "^0.3.0",
     "lodash": "^4.17.4",
