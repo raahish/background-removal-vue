@@ -10,7 +10,6 @@ pages:
   - git lfs pull
   - yarn
   - NODE_ENV=production npm run build
-  - cat dist/index.html
   - cp -r dist public
   artifacts:
     paths:
