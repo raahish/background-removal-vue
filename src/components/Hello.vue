@@ -19,8 +19,10 @@
       :parallelUploads="1"></droply>
 
     <div class="intermediates" v-if="showIntermediates">
-      <img src="" width="224" height="224" ref="inputImg" />
-      <canvas ref="inputCanvas" ></canvas>
+      <img src="" width="224" height="224" ref="inputImg" id="inputImg" />
+      <img src="" ref="originalImg" id="originalImg" />
+      <canvas ref="inputCanvas" id="inputCanvas"></canvas>
+      <canvas ref="resizedCanvas" id="resizedCanvas"></canvas>
     </div>
     <div class="error" v-if="imageLoadingError">Error loading URL</div>
     <div class="results" v-for="src of output">
@@ -137,6 +139,7 @@ export default {
     uploadFiles: function(files) {
       files.forEach(file => {
         this.$refs.dropzone.dropzone.createThumbnail(file, 224, 224, 'squeeze', true, dataUrl => {
+          console.log('original file WxH', file.width, file.height)
           const img =  this.$refs.inputImg || new Image
           img.onload = () => this.runModel(img, file)
           img.src=dataUrl
@@ -158,6 +161,24 @@ export default {
         self.emit("complete", file);
         self.processQueue();
       }
+    },
+
+    file2ImageData: function(file) {
+      return this.readLocalFile(file)
+        .then(result => new Promise((resolve, reject) => {
+          const img2 = this.$refs.originalImg || new Image
+          img2.onload = () => resolve(img2)
+          img2.onerror = reject
+          img2.src = result
+        })).then(img2 => {
+          const canvas = document.createElement('canvas')
+          canvas.width = img2.width
+          canvas.height = img2.height
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img2, 0, 0, img2.width, img2.height)
+          return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
+
+        })
     },
 
     runModel: function(img, file) {
@@ -198,7 +219,7 @@ export default {
         console.log('outputLayerName', outputLayerName)
         let n_activations = outputData.length / width / height
         console.log('n_activations', n_activations)
-        const argmaxArray = new Uint8ClampedArray(width*height*4) // 4 channels RGBA
+        const outputImage = new Uint8ClampedArray(width*height*4) // 4 channels RGBA
         let ii=0;
         for(let xy=0; xy<width*height; xy++) {
           let max = 0
@@ -210,18 +231,18 @@ export default {
             }
             ii+=1
           }
-//          argmaxArray[xy*4] = COLOR_CODES[max][0]
-//          argmaxArray[xy*4+1] = COLOR_CODES[max][1]
-//          argmaxArray[xy*4+2] = COLOR_CODES[max][2]
-//          argmaxArray[xy*4+3] = 255
+//          outputImage[xy*4] = COLOR_CODES[max][0]
+//          outputImage[xy*4+1] = COLOR_CODES[max][1]
+//          outputImage[xy*4+2] = COLOR_CODES[max][2]
+//          outputImage[xy*4+3] = 255
 
-          argmaxArray[xy*4] = data[xy*4]
-          argmaxArray[xy*4+1] = data[xy*4+1]
-          argmaxArray[xy*4+2] = data[xy*4+2]
-          argmaxArray[xy*4+3] = max!=BACKGROUND_CLASS ? maxValue*255 : 0
+          outputImage[xy*4] = data[xy*4]
+          outputImage[xy*4+1] = data[xy*4+1]
+          outputImage[xy*4+2] = data[xy*4+2]
+          outputImage[xy*4+3] = max!=BACKGROUND_CLASS ? maxValue*255 : 0
         }
 
-        this.drawOutput(new ImageData(argmaxArray, width, height))
+        this.drawOutput(new ImageData(outputImage, width, height), file)
         if(this.files.length) {
           this.loadNextImageToCanvas()
         } else {
@@ -230,14 +251,40 @@ export default {
         console.log('done displaying')
       })
     },
-    drawOutput: function(imageData, originalImageData, originalWidth, originalHeight) {
+
+    resizeOutput: function(imageData, file) {
       const canvas = document.createElement('canvas')
-      canvas.width = 224
-      canvas.height = 224
+      canvas.width = imageData.width // 224
+      canvas.height = imageData.height // 224
       const ctx = canvas.getContext('2d')
       ctx.putImageData(imageData, 0, 0)
 
-      this.output.unshift(canvas.toDataURL('image/png'))
+      const resizedCanvas = this.$refs.resizedCanvas || document.createElement('canvas')
+      resizedCanvas.width = file.width // original picture width
+      resizedCanvas.height = file.height  // original picture height
+      const resizedContext = resizedCanvas.getContext('2d')
+      resizedContext.scale(file.width / imageData.width, file.height / imageData.height)
+      resizedContext.drawImage(canvas, 0, 0)
+      return resizedCanvas
+    },
+
+    drawOutput: function(imageData, file) {
+      // Take the ALPHAs only from resizedImageData and combine with the original picture
+      this.file2ImageData(file).then((originalImageData) => {
+        const { data, width, height } = originalImageData
+
+        const resizedCanvas = this.resizeOutput(imageData, file)
+        const resizedContext = resizedCanvas.getContext('2d')
+        const {data: resizedData} = resizedContext.getImageData(0, 0, file.width, file.height)
+
+        let len = data.length
+        debugger
+        for(let i=3; i<len; i+=4) {
+          data[i] = resizedData[i]
+        }
+        resizedContext.putImageData(new ImageData(data, width, height), 0, 0)
+        this.output.unshift(resizedCanvas.toDataURL('image/png'))
+      })
     },
   }
 
