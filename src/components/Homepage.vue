@@ -18,15 +18,9 @@
       :dropzoneOptions="{resizeWidth: 448, resize: resize, parallelUploads: 1}"
       :parallelUploads="1"></droply>
 
-    <div class="intermediates" v-if="showIntermediates">
-      <img src="" width="224" height="224" ref="inputImg" id="inputImg" />
-      <img src="" ref="originalImg" id="originalImg" />
-      <canvas ref="inputCanvas" id="inputCanvas"></canvas>
-      <canvas ref="resizedCanvas" id="resizedCanvas"></canvas>
-    </div>
     <div class="error" v-if="imageLoadingError">Error loading URL</div>
-    <div class="results" v-for="src of output">
-      <img :src="src" />
+    <div class="results">
+      <img :src="src" v-for="src of output"/>
     </div>
   </div>
 </template>
@@ -56,8 +50,8 @@ const COLOR_CODES = [
   [0, 128, 192],
   [0, 0, 0]
 ]
-const NAMES = ['sky', 'building', 'column_pole', 'road', 'sidewalk', 'tree',
-  'sign', 'fence', 'car', 'pedestrian', 'bicyclist', 'void']
+//const NAMES = ['sky', 'building', 'column_pole', 'road', 'sidewalk', 'tree',
+//  'sign', 'fence', 'car', 'pedestrian', 'bicyclist', 'void']
 import * as KerasJS from 'keras-js'
 import _ from 'lodash'
 import loadImage from 'blueimp-load-image'
@@ -71,7 +65,7 @@ import Dropzone from 'dropzone'
 window.EXIF = EXIF // Dropzone needs this as a global
 
 export default {
-  name: 'hello',
+  name: 'homepage',
   components: {
     Droply
   },
@@ -278,7 +272,6 @@ export default {
         const {data: resizedData} = resizedContext.getImageData(0, 0, file.width, file.height)
 
         let len = data.length
-        debugger
         for(let i=3; i<len; i+=4) {
           data[i] = resizedData[i]
         }
