@@ -1,4 +1,4 @@
-# Keras.JS Model serving
+# Keras.JS Model serving.
 
 Check out the blogpost [here](https://medium.com/p/35648f9dc5fb)
 
