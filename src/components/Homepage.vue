@@ -88,8 +88,6 @@ export default {
     },
   },
   mounted: function () {
-    // https://stackoverflow.com/questions/33710825/getting-file-contents-when-using-dropzonejs
-//    this.$refs.dropzone.dropzone.accept = this.localAcceptHandler
     this.$refs.dropzone.dropzone.uploadFiles = this.uploadFiles
     this.model.ready().then(() => {
       this.modelLoading = false
@@ -175,6 +173,7 @@ export default {
     },
 
     runModel: function(img, file) {
+      // Resize img to input size of (224, 224)
       const canvas = this.$refs.inputCanvas || document.createElement('canvas')
       canvas.width = 224
       canvas.height = 224
@@ -182,17 +181,18 @@ export default {
       ctx.drawImage(img, 0, 0, img.width, img.height)
       const { data, width, height } = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
 
-//      // data processing
-//      // see https://github.com/fchollet/keras/blob/master/keras/applications/imagenet_utils.py
-//      // and https://github.com/fchollet/keras/blob/master/keras/applications/inception_v3.py
-      let dataTensor = ndarray(new Float32Array(data), [width, height, 4])
+      // Convert 4 channel (with alpha) => 3 channel RGb
+      let dataTensor = ndarray(data, [width, height, 4])
       let dataProcessedTensor = ndarray(new Float32Array(width * height * 3), [width, height, 3])
       ops.assign(dataProcessedTensor.pick(null, null, 0), dataTensor.pick(null, null, 0))
       ops.assign(dataProcessedTensor.pick(null, null, 1), dataTensor.pick(null, null, 1))
       ops.assign(dataProcessedTensor.pick(null, null, 2), dataTensor.pick(null, null, 2))
-      console.log('inputTensors', this.model.inputTensors)
+
+      // Introspect the model to get the inputTensor name
       const inputKey = Object.keys(this.model.inputTensors)[0]
-      const inputData = window.inputData = { [inputKey]: dataProcessedTensor.data }
+      const inputData = { [inputKey]: dataProcessedTensor.data }
+
+      // Get the model number of layers in order to update the progress bar
       const n_layers = Object.keys(this.model.modelDAG).length
       console.log("start", n_layers)
       const intervalId = setInterval(() => {
@@ -200,18 +200,23 @@ export default {
         this.updateDropzoneFileProgress(file, this.model.layersWithResults.length/n_layers*90)
       }, 1000)
       this.intervals.push(intervalId)
+
+      // Run prediction
       return this.model.predict(inputData).then(outputData => {
         console.log("done")
         clearInterval(intervalId)
         this.intervals.splice(this.intervals.indexOf(intervalId))
         this.updateDropzoneFileProgress(file, 100)
 
-        // Process output into Alpha channel
+        // Introspect the model in order to get the output layer name
         let outputLayerName = _.values(this.model.modelDAG).filter(node => !node.outbound.length)[0].name
-        outputData = outputData = outputData[outputLayerName]
-        console.log('outputLayerName', outputLayerName)
+        outputData = outputData[outputLayerName]
+
+        // Calculate the number of activations just in case our model changes
         let n_activations = outputData.length / width / height
         console.log('n_activations', n_activations)
+
+        // Process activations output into alpha channel
         const outputImage = new Uint8ClampedArray(width*height*4) // 4 channels RGBA
         let ii=0;
         for(let xy=0; xy<width*height; xy++) {
@@ -224,14 +229,11 @@ export default {
             }
             ii+=1
           }
-//          outputImage[xy*4] = COLOR_CODES[max][0]
-//          outputImage[xy*4+1] = COLOR_CODES[max][1]
-//          outputImage[xy*4+2] = COLOR_CODES[max][2]
-//          outputImage[xy*4+3] = 255
 
           outputImage[xy*4] = data[xy*4]
           outputImage[xy*4+1] = data[xy*4+1]
           outputImage[xy*4+2] = data[xy*4+2]
+          // If this pixel was segmented as BACKGROUND_CLASS, set alpha=0, otherwise set alpha according to its activation
           outputImage[xy*4+3] = max!=BACKGROUND_CLASS ? maxValue*255 : 0
         }
 
